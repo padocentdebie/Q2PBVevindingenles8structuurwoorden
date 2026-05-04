@@ -33,11 +33,12 @@
         .bold-tag { font-weight: bold; color: var(--p-blue); display: block; }
 
         .admin-bar { background: #1a2a3a; padding: 15px; position: fixed; bottom: 0; width: 100%; display: flex; justify-content: center; gap: 20px; align-items: center; color: white; border-top: 3px solid var(--p-gold); }
-        button { padding: 10px 20px; cursor: pointer; border: none; font-weight: bold; border-radius: 3px; font-size: 0.8rem; }
+        button { padding: 10px 20px; cursor: pointer; border: none; font-weight: bold; border-radius: 3px; font-size: 0.8rem; transition: opacity 0.2s; }
+        button:hover { opacity: 0.9; }
         .btn-gold { background: var(--p-gold); color: white; }
         .btn-blue { background: #34495e; color: white; }
         .btn-danger { background: var(--p-danger); color: white; margin-left: 50px; }
-        .hidden { display: none; }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body id="body-bg">
@@ -50,12 +51,15 @@
         <input type="text" id="firstname" placeholder="Voornaam" style="margin-bottom:15px;"><br>
         <select id="class-select" style="margin-bottom:20px;">
             <option value="" disabled selected>Kies eenheid...</option>
-            <option>Alpha</option><option>Bravo</option><option>Charlie</option><option>Delta</option>
-            <option>Echo</option><option>Foxtrot</option><option>Golf</option><option>Hotel</option>
-            <option>Juliett</option><option>Kilo</option><option>Lima</option><option>Mike</option>
+            <option value="Alpha">Alpha</option><option value="Bravo">Bravo</option>
+            <option value="Charlie">Charlie</option><option value="Delta">Delta</option>
+            <option value="Echo">Echo</option><option value="Foxtrot">Foxtrot</option>
+            <option value="Golf">Golf</option><option value="Hotel">Hotel</option>
+            <option value="Juliett">Juliett</option><option value="Kilo">Kilo</option>
+            <option value="Lima">Lima</option><option value="Mike">Mike</option>
         </select>
-        <button class="btn-blue" style="width:100%; margin-bottom:12px;" onclick="init('student')">Inloggen Agent</button>
-        <button class="btn-gold" style="width:60%; font-size: 0.7rem;" onclick="init('docent')">Commander Log-in</button>
+        <button class="btn-blue" style="width:100%; margin-bottom:12px;" onclick="window.init('student')">Inloggen Agent</button>
+        <button class="btn-gold" style="width:60%; font-size: 0.7rem;" onclick="window.init('docent')">Commander Log-in</button>
     </div>
 </div>
 
@@ -71,9 +75,9 @@
         
         <div class="input-section">
             <div class="field"><label style="font-size:0.7rem; font-weight:bold; color:#888;">STRUCTUURWOORD</label>
-                <input type="text" id="input-word" oninput="sendData()"></div>
+                <input type="text" id="input-word" oninput="window.sendData()"></div>
             <div class="field"><label style="font-size:0.7rem; font-weight:bold; color:#888;">VERBAND</label>
-                <input type="text" id="input-relation" oninput="sendData()"></div>
+                <input type="text" id="input-relation" oninput="window.sendData()"></div>
         </div>
         <div id="feed-list"><label style="border-bottom: 1px solid var(--p-gold); display:block; padding-bottom:5px;">LIVE FEED ANALYSE:</label></div>
     </div>
@@ -96,14 +100,14 @@
 </div>
 
 <div id="admin-bar" class="admin-bar hidden">
-    <button class="btn-gold" onclick="moveCase(-1)">VORIGE</button>
+    <button class="btn-gold" onclick="window.moveCase(-1)">VORIGE</button>
     <span id="case-count" style="font-size: 1.1rem; min-width: 120px; text-align: center;">ZAAK 1 / 13</span>
-    <button class="btn-gold" onclick="moveCase(1)">VOLGENDE</button>
-    <button class="btn-danger" onclick="hardReset()">RESET DOSSIER</button>
+    <button class="btn-gold" onclick="window.moveCase(1)">VOLGENDE</button>
+    <button class="btn-danger" onclick="window.hardReset()">RESET DOSSIER</button>
 </div>
 
 <script>
-// 1. Configuratie
+// Firebase configuratie
 const firebaseConfig = {
     apiKey: "AIzaSyB12mTMBnuxdC4W4htyFO_C7Dnh3maVKew",
     authDomain: "decoroefening.firebaseapp.com",
@@ -113,8 +117,6 @@ const firebaseConfig = {
     messagingSenderId: "945998495824",
     appId: "1:945998495824:web:a76dc7519b3b262a021155"
 };
-
-// 2. Initialisatie
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
@@ -137,40 +139,44 @@ const zinnen = [
 let currentUser = "";
 let currentIdx = -1;
 
-// 3. De Inlogfunctie (Nu gekoppeld aan window voor directe toegang)
+// INITIALISATIE FUNCTIE
 window.init = function(role) {
-    const fName = document.getElementById('firstname').value;
-    const eKlas = document.getElementById('class-select').value;
+    const fName = document.getElementById('firstname').value.trim();
+    let eKlas = document.getElementById('class-select').value;
     
-    if(!fName || !eKlas || eKlas === "") {
-        alert("Vul je naam in en kies een eenheid.");
+    // Voor de commander maken we de klas optioneel als ze het vergeten
+    if(role === 'docent' && !eKlas) eKlas = "STAFF";
+
+    if(!fName || !eKlas) {
+        alert("Identificatie onvolledig. Vul je naam in en selecteer een eenheid.");
         return;
     }
-    
-    currentUser = fName.trim() + "-" + eKlas;
-    document.getElementById('login-screen').style.display = 'none';
+
+    currentUser = fName + "-" + eKlas;
+    document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('user-display').innerText = (role === 'docent' ? "COMMANDANT: " : "AGENT: ") + currentUser.toUpperCase();
     
     if(role === 'docent') {
         document.getElementById('admin-bar').classList.remove('hidden');
     }
 
-    // Start database synchronisatie
+    // Luisteren naar de huidige case
     db.ref('les8/config/currentCase').on('value', s => {
-        const newIdx = s.val() || 0;
+        const val = s.val();
+        const newIdx = (val !== null) ? val : 0;
         if(currentIdx !== -1 && currentIdx !== newIdx) triggerAlert();
         currentIdx = newIdx;
         resetAndLoadCase();
     });
-    
+
+    // Luisteren naar live feed
     db.ref('les8/live').on('value', s => renderFeed(s.val()));
 };
 
-// 4. Overige functies (ongewijzigd)
 function triggerAlert() {
     document.getElementById('body-bg').classList.add('flash-active');
     const audio = document.getElementById('dispatch-sound');
-    if(audio) audio.play().catch(()=>{});
+    if(audio) audio.play().catch(() => {});
     setTimeout(() => document.getElementById('body-bg').classList.remove('flash-active'), 600);
 }
 
@@ -183,7 +189,7 @@ function resetAndLoadCase() {
 }
 
 window.sendData = function() {
-    if(!currentUser) return;
+    if(!currentUser || currentIdx === -1) return;
     const cleanUser = currentUser.replace(/[.#$/[\]]/g, "_");
     db.ref('les8/live/' + currentIdx + '/' + cleanUser).set({
         name: currentUser, 
@@ -207,16 +213,19 @@ function renderFeed(data) {
 
 window.moveCase = function(step) {
     let n = currentIdx + step;
-    if(n >= 0 && n < zinnen.length) db.ref('les8/config/currentCase').set(n);
+    if(n >= 0 && n < zinnen.length) {
+        db.ref('les8/config/currentCase').set(n);
+    }
 };
 
 window.hardReset = function() {
-    if(confirm("LET OP: Dit wist ALLE antwoorden. Weet je het zeker?")) {
+    if(confirm("LET OP: Dit wist ALLE antwoorden van de studenten. Weet je het zeker?")) {
         db.ref('les8').remove().then(() => {
             db.ref('les8/config/currentCase').set(0);
-            alert("Dossier is gereset.");
+            alert("Dossier is volledig gewist.");
         });
     }
 };
 </script>
+</body>
 </html>
