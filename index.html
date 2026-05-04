@@ -103,6 +103,7 @@
 </div>
 
 <script>
+// 1. Configuratie
 const firebaseConfig = {
     apiKey: "AIzaSyB12mTMBnuxdC4W4htyFO_C7Dnh3maVKew",
     authDomain: "decoroefening.firebaseapp.com",
@@ -112,6 +113,8 @@ const firebaseConfig = {
     messagingSenderId: "945998495824",
     appId: "1:945998495824:web:a76dc7519b3b262a021155"
 };
+
+// 2. Initialisatie
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
@@ -134,53 +137,60 @@ const zinnen = [
 let currentUser = "";
 let currentIdx = -1;
 
-// FUNCTIE BOVENAAN GEZET VOOR CORRECTE INITIALISATIE
+// 3. De Inlogfunctie (Nu gekoppeld aan window voor directe toegang)
 window.init = function(role) {
-    const fName = document.getElementById('firstname').value.trim();
+    const fName = document.getElementById('firstname').value;
     const eKlas = document.getElementById('class-select').value;
     
-    if(!fName || !eKlas) {
-        alert("Identificatie onvolledig.");
+    if(!fName || !eKlas || eKlas === "") {
+        alert("Vul je naam in en kies een eenheid.");
         return;
     }
     
-    currentUser = `${fName}-${eKlas}`;
-    document.getElementById('login-screen').classList.add('hidden');
+    currentUser = fName.trim() + "-" + eKlas;
+    document.getElementById('login-screen').style.display = 'none';
     document.getElementById('user-display').innerText = (role === 'docent' ? "COMMANDANT: " : "AGENT: ") + currentUser.toUpperCase();
     
-    if(role === 'docent') document.getElementById('admin-bar').classList.remove('hidden');
+    if(role === 'docent') {
+        document.getElementById('admin-bar').classList.remove('hidden');
+    }
 
+    // Start database synchronisatie
     db.ref('les8/config/currentCase').on('value', s => {
         const newIdx = s.val() || 0;
         if(currentIdx !== -1 && currentIdx !== newIdx) triggerAlert();
         currentIdx = newIdx;
         resetAndLoadCase();
     });
+    
     db.ref('les8/live').on('value', s => renderFeed(s.val()));
-}
+};
 
+// 4. Overige functies (ongewijzigd)
 function triggerAlert() {
     document.getElementById('body-bg').classList.add('flash-active');
-    document.getElementById('dispatch-sound').play().catch(()=>{});
+    const audio = document.getElementById('dispatch-sound');
+    if(audio) audio.play().catch(()=>{});
     setTimeout(() => document.getElementById('body-bg').classList.remove('flash-active'), 600);
 }
 
 function resetAndLoadCase() {
-    document.getElementById('display-sentence').innerText = zinnen[currentIdx] || "Einde dossier.";
+    document.getElementById('display-sentence').innerText = zinnen[currentIdx] || "Einde Dossier";
     document.getElementById('case-header').innerText = "DOSSIERSTUK #" + (currentIdx + 1);
-    document.getElementById('case-count').innerText = `ZAAK ${currentIdx + 1} / 13`;
+    document.getElementById('case-count').innerText = "ZAAK " + (currentIdx + 1) + " / 13";
     document.getElementById('input-word').value = "";
     document.getElementById('input-relation').value = "";
 }
 
-function sendData() {
+window.sendData = function() {
     if(!currentUser) return;
-    db.ref(`les8/live/${currentIdx}/${currentUser.replace(/[.#$/[\]]/g, "_")}`).set({
+    const cleanUser = currentUser.replace(/[.#$/[\]]/g, "_");
+    db.ref('les8/live/' + currentIdx + '/' + cleanUser).set({
         name: currentUser, 
         word: document.getElementById('input-word').value, 
         relation: document.getElementById('input-relation').value
     });
-}
+};
 
 function renderFeed(data) {
     const feed = document.getElementById('feed-list');
@@ -189,24 +199,24 @@ function renderFeed(data) {
         Object.values(data[currentIdx]).forEach(entry => {
             const div = document.createElement('div');
             div.className = 'feed-entry';
-            div.innerHTML = `<span class="agent-name">${entry.name}</span> <span class="agent-data">[${entry.word || '...'} | ${entry.relation || '...'}]</span>`;
+            div.innerHTML = '<span class="agent-name">' + entry.name + '</span> <span class="agent-data">[' + (entry.word || '...') + ' | ' + (entry.relation || '...') + ']</span>';
             feed.prepend(div);
         });
     }
 }
 
-function moveCase(step) {
+window.moveCase = function(step) {
     let n = currentIdx + step;
     if(n >= 0 && n < zinnen.length) db.ref('les8/config/currentCase').set(n);
-}
+};
 
-function hardReset() {
-    if(confirm("LET OP: Dit wist ALLE antwoorden van de studenten voor deze hele les. Weet je het zeker?")) {
+window.hardReset = function() {
+    if(confirm("LET OP: Dit wist ALLE antwoorden. Weet je het zeker?")) {
         db.ref('les8').remove().then(() => {
             db.ref('les8/config/currentCase').set(0);
-            alert("Dossier is gewist en gereset naar Zin 1.");
+            alert("Dossier is gereset.");
         });
     }
-}
-</script></body>
+};
+</script>
 </html>
