@@ -134,13 +134,20 @@ const zinnen = [
 let currentUser = "";
 let currentIdx = -1;
 
-function init(role) {
-    const fName = document.getElementById('firstname').value;
+// FUNCTIE BOVENAAN GEZET VOOR CORRECTE INITIALISATIE
+window.init = function(role) {
+    const fName = document.getElementById('firstname').value.trim();
     const eKlas = document.getElementById('class-select').value;
-    if(!fName || !eKlas) return alert("Identificatie onvolledig.");
+    
+    if(!fName || !eKlas) {
+        alert("Identificatie onvolledig.");
+        return;
+    }
+    
     currentUser = `${fName}-${eKlas}`;
     document.getElementById('login-screen').classList.add('hidden');
     document.getElementById('user-display').innerText = (role === 'docent' ? "COMMANDANT: " : "AGENT: ") + currentUser.toUpperCase();
+    
     if(role === 'docent') document.getElementById('admin-bar').classList.remove('hidden');
 
     db.ref('les8/config/currentCase').on('value', s => {
@@ -159,7 +166,7 @@ function triggerAlert() {
 }
 
 function resetAndLoadCase() {
-    document.getElementById('display-sentence').innerText = zinnen[currentIdx];
+    document.getElementById('display-sentence').innerText = zinnen[currentIdx] || "Einde dossier.";
     document.getElementById('case-header').innerText = "DOSSIERSTUK #" + (currentIdx + 1);
     document.getElementById('case-count').innerText = `ZAAK ${currentIdx + 1} / 13`;
     document.getElementById('input-word').value = "";
@@ -167,8 +174,11 @@ function resetAndLoadCase() {
 }
 
 function sendData() {
+    if(!currentUser) return;
     db.ref(`les8/live/${currentIdx}/${currentUser.replace(/[.#$/[\]]/g, "_")}`).set({
-        name: currentUser, word: document.getElementById('input-word').value, relation: document.getElementById('input-relation').value
+        name: currentUser, 
+        word: document.getElementById('input-word').value, 
+        relation: document.getElementById('input-relation').value
     });
 }
 
@@ -198,6 +208,5 @@ function hardReset() {
         });
     }
 }
-</script>
-</body>
+</script></body>
 </html>
